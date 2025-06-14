@@ -6,6 +6,11 @@ import axios from 'axios';
 const router = express.Router();
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:8080';
 
+// Add test route for connection checking
+router.get('/test', (req, res) => {
+    res.json({ message: 'Auth service is working!' });
+});
+
 router.post('/register', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -13,9 +18,27 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Username and password are required' });
         }
 
-        await axios.post(`${USER_SERVICE_URL}/api/users/register`, { username, password });
+        // Log the request for debugging
+        console.log(`Attempting to register user: ${username}`);
+        console.log(`Sending request to: ${USER_SERVICE_URL}/api/users/register`);
+        console.log('Request body:', JSON.stringify(req.body));
+
+        const response = await axios.post(`${USER_SERVICE_URL}/api/users/register`, { username, password });
+        console.log(`User ${username} registered successfully`);
+        console.log('Response:', JSON.stringify(response.data));
+        
         res.status(201).json({ message: 'User registered successfully' });
     } catch (error) {
+        console.error('Registration error:', error.message);
+        if (error.response) {
+            console.error('Error response status:', error.response.status);
+            console.error('Error response data:', error.response.data);
+        } else if (error.request) {
+            console.error('Error request:', error.request);
+        } else {
+            console.error('Error:', error);
+        }
+        
         const status = error.response?.status || 500;
         const message = error.response?.data?.message || 'Internal server error';
         res.status(status).json({ message });
