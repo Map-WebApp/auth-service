@@ -40,7 +40,20 @@ router.post('/register', async (req, res) => {
         }
         
         const status = error.response?.status || 500;
-        const message = error.response?.data?.message || 'Internal server error';
+        
+        // Propagate the error message from the user-service, or provide a default one.
+        // If the upstream response is a string, use it directly.
+        // If it's an object with a 'message' property, use that.
+        // Otherwise, fall back to a generic error.
+        let message = 'Internal server error';
+        if (error.response?.data) {
+            if (typeof error.response.data === 'string') {
+                message = error.response.data;
+            } else if (error.response.data.message) {
+                message = error.response.data.message;
+            }
+        }
+        
         res.status(status).json({ message });
     }
 });
@@ -52,19 +65,9 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ message: 'Username and password are required' });
         }
         
-        // Call user-service to get user details, including password hash
-        const response = await axios.post(`${USER_SERVICE_URL}/api/users/validate-password`, { username, password });
+        // Call user-service to validate user credentials
+        const response = await axios.post(`${USER_SERVICE_URL}/api/users/login`, { username, password });
         const user = response.data;
-
-        if (!user || !user.password) {
-             return res.status(401).json({ message: 'Invalid credentials' });
-        }
-
-        // Compare the provided password with the stored hash
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
 
         // Generate JWT
         const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
@@ -72,7 +75,7 @@ router.post('/login', async (req, res) => {
 
     } catch (error) {
         const status = error.response?.status || 500;
-        const message = error.response?.data || 'Invalid credentials';
+        const message = error.response?.data?.message || error.response?.data || 'Invalid credentials';
         res.status(status).json({ message });
     }
 });
